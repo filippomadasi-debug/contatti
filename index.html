@@ -94,6 +94,10 @@ pre.sql{background:#20293d;color:#cfe0ff;padding:12px;border-radius:8px;font-siz
 
 <!-- DASHBOARD -->
 <section id="view-dashboard" class="view active">
+  <div class="toolbar">
+    <select id="dClientFilter" onchange="renderDashboard()"><option value="">Tutti i clienti</option></select>
+    <select id="dPersonFilter" onchange="renderDashboard()"><option value="">Tutte le persone</option></select>
+  </div>
   <div class="stats">
     <div class="stat"><div class="num" id="stContacts">0</div><div class="lbl">Contatti</div></div>
     <div class="stat"><div class="num" id="stClients">0</div><div class="lbl">Clienti</div></div>
@@ -329,10 +333,16 @@ function refreshFilters(){
   const cf = document.getElementById("cClientFilter");
   const cur = cf.value;
   cf.innerHTML = '<option value="">Tutti i clienti</option>' + clients.map(c=>`<option ${c===cur?"selected":""}>${esc(c)}</option>`).join("");
+  const dcf = document.getElementById("dClientFilter");
+  const curDc = dcf.value;
+  dcf.innerHTML = '<option value="">Tutti i clienti</option>' + clients.map(c=>`<option ${c===curDc?"selected":""}>${esc(c)}</option>`).join("");
   const pf = document.getElementById("ePersonFilter");
   const curP = pf.value;
   const people = [...state.contacts].sort(byCognome);
   pf.innerHTML = '<option value="">Tutte le persone</option>' + people.map(c=>`<option value="${c.id}" ${c.id===curP?"selected":""}>${esc(fullName(c))}</option>`).join("");
+  const dpf = document.getElementById("dPersonFilter");
+  const curDp = dpf.value;
+  dpf.innerHTML = '<option value="">Tutte le persone</option>' + people.map(c=>`<option value="${c.id}" ${c.id===curDp?"selected":""}>${esc(fullName(c))}</option>`).join("");
   const tf = document.getElementById("eToneFilter");
   const curT = tf.value;
   tf.innerHTML = '<option value="">Tutti i toni</option>' + TONES.map(t=>`<option ${t===curT?"selected":""}>${t}</option>`).join("");
@@ -348,14 +358,23 @@ function lastEventDateFor(contactId){
 }
 function renderDashboard(){
   const now = new Date(), d30 = new Date(now-30*864e5).toISOString().slice(0,10), d90 = new Date(now-90*864e5).toISOString().slice(0,10);
-  document.getElementById("stContacts").textContent = state.contacts.length;
-  document.getElementById("stClients").textContent = new Set(state.contacts.map(c=>c.cliente).filter(Boolean)).size;
-  document.getElementById("stEvents30").textContent = state.events.filter(e=>e.data>=d30).length;
+  // filtri dashboard
+  const pSel = document.getElementById("dPersonFilter").value;
+  const cSel = document.getElementById("dClientFilter").value;
+  let fContacts = state.contacts;
+  if(cSel) fContacts = fContacts.filter(c=>c.cliente===cSel);
+  if(pSel) fContacts = fContacts.filter(c=>c.id===pSel);
+  const idSet = new Set(fContacts.map(c=>c.id));
+  const fEvents = (pSel||cSel) ? state.events.filter(e=>(e.contact_ids||[]).some(id=>idSet.has(id))) : state.events;
 
-  const recent = [...state.events].sort((a,b)=>(b.data||"").localeCompare(a.data||"")).slice(0,5);
+  document.getElementById("stContacts").textContent = fContacts.length;
+  document.getElementById("stClients").textContent = new Set(fContacts.map(c=>c.cliente).filter(Boolean)).size;
+  document.getElementById("stEvents30").textContent = fEvents.filter(e=>e.data>=d30).length;
+
+  const recent = [...fEvents].sort((a,b)=>(b.data||"").localeCompare(a.data||"")).slice(0,5);
   document.getElementById("dashRecent").innerHTML = recent.length ? recent.map(eventRowHtml).join("") : '<div class="empty">Nessun evento registrato</div>';
 
-  const stale = state.contacts.map(c=>({c, last:lastEventDateFor(c.id)}))
+  const stale = fContacts.map(c=>({c, last:lastEventDateFor(c.id)}))
     .filter(x=>!x.last || x.last < d30)
     .sort((a,b)=>(a.last||"0").localeCompare(b.last||"0")).slice(0,6);
   document.getElementById("dashStale").innerHTML = stale.length ? stale.map(x=>`
@@ -364,7 +383,7 @@ function renderDashboard(){
       <div class="t2">${esc(x.c.ruolo||"")}${x.c.ruolo?" · ":""}${esc(x.c.cliente||"")}</div>
     </div>`).join("") : '<div class="empty">Tutti i contatti sono stati sentiti di recente 👍</div>';
 
-  const recent90 = state.events.filter(e=>e.data>=d90 && e.tono);
+  const recent90 = fEvents.filter(e=>e.data>=d90 && e.tono);
   if(recent90.length){
     const counts = {};
     TONES.forEach(t=>counts[t]=0);
