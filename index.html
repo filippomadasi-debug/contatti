@@ -4,6 +4,8 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
 <title>Contatti Clienti</title>
+<!-- v1.1 - suggerimento clienti esistenti -->
+
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
 :root{
@@ -63,6 +65,11 @@ label:first-child{margin-top:0}
 #toast{position:fixed;left:50%;transform:translateX(-50%);bottom:84px;background:#20293d;color:#fff;padding:10px 18px;border-radius:24px;font-size:13px;opacity:0;transition:opacity .3s;z-index:200;pointer-events:none;max-width:90%}
 #toast.show{opacity:1}
 pre.sql{background:#20293d;color:#cfe0ff;padding:12px;border-radius:8px;font-size:11.5px;overflow-x:auto;white-space:pre;margin-top:8px}
+.suggest{position:relative}
+.suggest-list{position:absolute;top:100%;left:0;right:0;background:#fff;border:1px solid var(--border);border-radius:8px;box-shadow:0 6px 18px rgba(20,30,60,.18);z-index:30;max-height:190px;overflow-y:auto;display:none}
+.suggest-list div{padding:11px 12px;cursor:pointer;font-size:14px;border-bottom:1px solid var(--border)}
+.suggest-list div:last-child{border-bottom:none}
+.suggest-list div:hover{background:#eef2f9}
 .hint{font-size:12.5px;color:var(--muted);margin-top:6px;line-height:1.5}
 @media(min-width:700px){
   .modal-bg{align-items:center}
@@ -178,8 +185,10 @@ create policy "anon all e" on events for all using (true) with check (true);</pr
   <div class="modal">
     <h2 id="contactModalTitle">Nuovo contatto</h2>
     <label>Cliente (azienda) *</label>
-    <input id="fCliente" list="clientiList" placeholder="Es. ACME S.p.A.">
-    <datalist id="clientiList"></datalist>
+    <div class="suggest">
+      <input id="fCliente" placeholder="Es. ACME S.p.A." autocomplete="off" oninput="renderClienteSuggest()" onfocus="renderClienteSuggest()">
+      <div class="suggest-list" id="clienteSuggest"></div>
+    </div>
     <div class="row2">
       <div><label>Nome *</label><input id="fNome"></div>
       <div><label>Cognome *</label><input id="fCognome"></div>
@@ -318,8 +327,6 @@ function refreshFilters(){
   const cf = document.getElementById("cClientFilter");
   const cur = cf.value;
   cf.innerHTML = '<option value="">Tutti i clienti</option>' + clients.map(c=>`<option ${c===cur?"selected":""}>${esc(c)}</option>`).join("");
-  const dl = document.getElementById("clientiList");
-  dl.innerHTML = clients.map(c=>`<option value="${esc(c)}">`).join("");
   const pf = document.getElementById("ePersonFilter");
   const curP = pf.value;
   const people = [...state.contacts].sort((a,b)=>fullName(a).localeCompare(fullName(b)));
@@ -387,6 +394,22 @@ function renderContacts(){
   }).join("") : '<div class="empty">Nessun contatto. Premi “+ Nuovo” per iniziare.</div>';
 }
 
+function clientiEsistenti(){
+  return [...new Set(state.contacts.map(c=>(c.cliente||"").trim()).filter(Boolean))].sort((a,b)=>a.localeCompare(b));
+}
+let _clienteSuggest = [];
+function renderClienteSuggest(){
+  const inp = document.getElementById("fCliente"), box = document.getElementById("clienteSuggest");
+  const q = inp.value.trim().toLowerCase();
+  _clienteSuggest = clientiEsistenti().filter(c=>!q || c.toLowerCase().includes(q));
+  if(!_clienteSuggest.length || (_clienteSuggest.length===1 && _clienteSuggest[0].toLowerCase()===q)){
+    box.style.display = "none"; return;
+  }
+  box.innerHTML = _clienteSuggest.map((c,i)=>`<div data-i="${i}">🏢 ${esc(c)}</div>`).join("");
+  box.style.display = "block";
+}
+function hideClienteSuggest(){ document.getElementById("clienteSuggest").style.display = "none"; }
+
 function openContactForm(id){
   editingContactId = id || null;
   document.getElementById("contactModalTitle").textContent = id ? "Modifica contatto" : "Nuovo contatto";
@@ -397,13 +420,22 @@ function openContactForm(id){
   document.getElementById("fCognome").value = c.cognome||"";
   document.getElementById("fRuolo").value = c.ruolo||"";
   document.getElementById("fNote").value = c.note||"";
+  hideClienteSuggest();
   openModal("contactModal");
 }
 async function saveContactForm(){
   const nome = document.getElementById("fNome").value.trim();
   const cognome = document.getElementById("fCognome").value.trim();
-  const cliente = document.getElementById("fCliente").value.trim();
+  let cliente = document.getElementById("fCliente").value.trim();
   if(!nome || !cognome || !cliente){ toast("Compila cliente, nome e cognome"); return; }
+  // riusa la grafia esatta di un cliente già esistente (evita doppioni tipo "Acme" / "ACME")
+  const canon = clientiEsistenti().find(c=>c.toLowerCase()===cliente.toLowerCase());
+  if(canon) cliente = canon;
+  // avvisa se la persona sembra già esistere
+  if(!editingContactId){
+    const dup = state.contacts.find(c=>fullName(c).toLowerCase()===(nome+" "+cognome).toLowerCase());
+    if(dup && !confirm(`Esiste già "${fullName(dup)}" (${dup.cliente||"senza cliente"}). Salvare comunque come nuovo contatto?`)) return;
+  }
   const rec = {
     id: editingContactId || uuid(),
     cliente, nome, cognome,
@@ -575,6 +607,13 @@ function importJson(input){
 function openModal(id){ document.getElementById(id).classList.add("open"); }
 function closeModal(id){ document.getElementById(id).classList.remove("open"); }
 document.querySelectorAll(".modal-bg").forEach(m=>m.addEventListener("click", e=>{ if(e.target===m) m.classList.remove("open"); }));
+document.getElementById("clienteSuggest").addEventListener("mousedown", e=>{
+  const d = e.target.closest("div[data-i]"); if(!d) return;
+  e.preventDefault();
+  document.getElementById("fCliente").value = _clienteSuggest[+d.dataset.i];
+  hideClienteSuggest();
+});
+document.getElementById("fCliente").addEventListener("blur", ()=>setTimeout(hideClienteSuggest, 150));
 
 /* ---------- init ---------- */
 (async function(){
