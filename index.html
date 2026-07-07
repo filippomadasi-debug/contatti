@@ -1,0 +1,590 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>Contatti Clienti</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+:root{
+  --primary:#1355c9; --primary-dark:#0e4098; --bg:#f3f5f9; --card:#ffffff;
+  --text:#1c2333; --muted:#6b7486; --border:#e2e6ee; --danger:#d43a3a;
+  --radius:12px; --shadow:0 1px 3px rgba(20,30,60,.08);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;background:var(--bg);color:var(--text);font-size:15px}
+header{background:var(--primary);color:#fff;padding:14px 20px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:50}
+header h1{font-size:17px;font-weight:600}
+#syncBadge{font-size:11px;padding:3px 9px;border-radius:20px;background:rgba(255,255,255,.2)}
+nav{display:flex;gap:4px;background:var(--card);border-bottom:1px solid var(--border);position:sticky;top:49px;z-index:49}
+nav button{flex:1;padding:12px 4px;border:none;background:none;font-size:13px;font-weight:600;color:var(--muted);cursor:pointer;border-bottom:3px solid transparent}
+nav button.active{color:var(--primary);border-bottom-color:var(--primary)}
+main{max-width:860px;margin:0 auto;padding:16px 14px 90px}
+.view{display:none}.view.active{display:block}
+.card{background:var(--card);border-radius:var(--radius);box-shadow:var(--shadow);padding:16px;margin-bottom:12px}
+.card h3{font-size:14px;color:var(--muted);font-weight:600;margin-bottom:10px;text-transform:uppercase;letter-spacing:.4px}
+.btn{display:inline-flex;align-items:center;gap:6px;border:none;border-radius:8px;padding:10px 16px;font-size:14px;font-weight:600;cursor:pointer;background:#e8ecf4;color:var(--text)}
+.btn-primary{background:var(--primary);color:#fff}
+.btn-danger{background:var(--danger);color:#fff}
+.btn-sm{padding:6px 10px;font-size:12px}
+.btn:active{transform:scale(.98)}
+input,select,textarea{width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:8px;font-size:15px;background:#fff;color:var(--text);font-family:inherit}
+textarea{min-height:70px;resize:vertical}
+label{display:block;font-size:12px;font-weight:600;color:var(--muted);margin:12px 0 5px}
+label:first-child{margin-top:0}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.toolbar{display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap}
+.toolbar input,.toolbar select{flex:1;min-width:130px;width:auto}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:12px}
+.stat{background:var(--card);border-radius:var(--radius);box-shadow:var(--shadow);padding:14px;text-align:center}
+.stat .num{font-size:26px;font-weight:700;color:var(--primary)}
+.stat .lbl{font-size:11px;color:var(--muted);margin-top:2px}
+.item{padding:12px 0;border-bottom:1px solid var(--border);cursor:pointer}
+.item:last-child{border-bottom:none}
+.item .t1{font-weight:600;display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap}
+.item .t2{font-size:13px;color:var(--muted);margin-top:3px}
+.item .t3{font-size:13px;margin-top:5px;white-space:pre-wrap}
+.badge{display:inline-block;font-size:11px;font-weight:600;padding:3px 9px;border-radius:20px;white-space:nowrap}
+.tone-mp{background:#d7f5df;color:#137a33}.tone-p{background:#e6f6ea;color:#2c8a4b}
+.tone-n{background:#eceff5;color:#5a6475}.tone-t{background:#fdeed6;color:#a86412}.tone-neg{background:#fbdcdc;color:#a82626}
+.chip{display:inline-block;background:#e8ecf4;border-radius:20px;padding:2px 9px;font-size:12px;margin:2px 3px 0 0}
+.empty{color:var(--muted);text-align:center;padding:24px 0;font-size:14px}
+.fab{position:fixed;right:18px;bottom:18px;width:56px;height:56px;border-radius:50%;background:var(--primary);color:#fff;border:none;font-size:28px;box-shadow:0 4px 14px rgba(19,85,201,.4);cursor:pointer;z-index:40;display:none}
+.modal-bg{display:none;position:fixed;inset:0;background:rgba(15,22,40,.5);z-index:100;align-items:flex-end;justify-content:center}
+.modal-bg.open{display:flex}
+.modal{background:#fff;width:100%;max-width:560px;max-height:92vh;overflow-y:auto;border-radius:16px 16px 0 0;padding:20px}
+.modal h2{font-size:17px;margin-bottom:14px}
+.modal-actions{display:flex;gap:10px;margin-top:18px;justify-content:flex-end;flex-wrap:wrap}
+.people-box{max-height:180px;overflow-y:auto;border:1px solid var(--border);border-radius:8px;padding:8px;margin-top:5px}
+.people-box label{display:flex;align-items:center;gap:8px;margin:0;padding:7px 4px;font-size:14px;font-weight:400;color:var(--text);cursor:pointer;text-transform:none}
+.people-box input[type=checkbox]{width:auto}
+.tonebar{display:flex;height:10px;border-radius:6px;overflow:hidden;margin-top:8px}
+.tonebar div{height:100%}
+#toast{position:fixed;left:50%;transform:translateX(-50%);bottom:84px;background:#20293d;color:#fff;padding:10px 18px;border-radius:24px;font-size:13px;opacity:0;transition:opacity .3s;z-index:200;pointer-events:none;max-width:90%}
+#toast.show{opacity:1}
+pre.sql{background:#20293d;color:#cfe0ff;padding:12px;border-radius:8px;font-size:11.5px;overflow-x:auto;white-space:pre;margin-top:8px}
+.hint{font-size:12.5px;color:var(--muted);margin-top:6px;line-height:1.5}
+@media(min-width:700px){
+  .modal-bg{align-items:center}
+  .modal{border-radius:16px}
+  nav button{flex:none;padding:12px 22px}
+}
+@media(max-width:699px){.fab.show{display:block}}
+</style>
+</head>
+<body>
+<header>
+  <h1>📇 Contatti Clienti</h1>
+  <span id="syncBadge">Locale</span>
+</header>
+<nav>
+  <button data-view="dashboard" class="active" onclick="switchView('dashboard')">Dashboard</button>
+  <button data-view="contacts" onclick="switchView('contacts')">Contatti</button>
+  <button data-view="events" onclick="switchView('events')">Eventi</button>
+  <button data-view="settings" onclick="switchView('settings')">⚙️</button>
+</nav>
+<main>
+
+<!-- DASHBOARD -->
+<section id="view-dashboard" class="view active">
+  <div class="stats">
+    <div class="stat"><div class="num" id="stContacts">0</div><div class="lbl">Contatti</div></div>
+    <div class="stat"><div class="num" id="stClients">0</div><div class="lbl">Clienti</div></div>
+    <div class="stat"><div class="num" id="stEvents30">0</div><div class="lbl">Eventi 30 gg</div></div>
+  </div>
+  <div class="card">
+    <h3>Ultime interazioni</h3>
+    <div id="dashRecent"></div>
+  </div>
+  <div class="card">
+    <h3>Da risentire (30+ giorni)</h3>
+    <div id="dashStale"></div>
+  </div>
+  <div class="card">
+    <h3>Tono ultimi 90 giorni</h3>
+    <div id="dashTone"></div>
+  </div>
+</section>
+
+<!-- CONTATTI -->
+<section id="view-contacts" class="view">
+  <div class="toolbar">
+    <input id="cSearch" placeholder="🔍 Cerca nome, ruolo, note…" oninput="renderContacts()">
+    <select id="cClientFilter" onchange="renderContacts()"><option value="">Tutti i clienti</option></select>
+    <button class="btn btn-primary" onclick="openContactForm()">+ Nuovo</button>
+  </div>
+  <div class="card"><div id="contactList"></div></div>
+</section>
+
+<!-- EVENTI -->
+<section id="view-events" class="view">
+  <div class="toolbar">
+    <select id="ePersonFilter" onchange="renderEvents()"><option value="">Tutte le persone</option></select>
+    <select id="eToneFilter" onchange="renderEvents()"><option value="">Tutti i toni</option></select>
+    <input type="date" id="eFrom" onchange="renderEvents()" title="Dal">
+    <input type="date" id="eTo" onchange="renderEvents()" title="Al">
+    <button class="btn btn-primary" onclick="openEventForm()">+ Nuovo</button>
+  </div>
+  <div class="card"><div id="eventList"></div></div>
+</section>
+
+<!-- IMPOSTAZIONI -->
+<section id="view-settings" class="view">
+  <div class="card">
+    <h3>Sincronizzazione cloud (Supabase)</h3>
+    <p class="hint">Per avere gli stessi dati su telefono e PC: 1) crea un progetto gratuito su <b>supabase.com</b> (regione EU) · 2) nel <i>SQL Editor</i> esegui lo script qui sotto · 3) da <i>Project Settings → API</i> copia URL e chiave <i>anon public</i> e incollali qui. Ripeti il punto 3 su ogni dispositivo.</p>
+    <label>URL progetto</label>
+    <input id="sbUrl" placeholder="https://xxxx.supabase.co">
+    <label>Chiave anon public</label>
+    <input id="sbKey" placeholder="eyJhbGciOi…">
+    <div class="modal-actions" style="justify-content:flex-start">
+      <button class="btn btn-primary" onclick="saveSupabaseCfg()">Salva e connetti</button>
+      <button class="btn" onclick="disconnectSupabase()">Disconnetti</button>
+      <button class="btn" id="migrateBtn" onclick="migrateLocalToCloud()">⬆️ Carica dati locali nel cloud</button>
+    </div>
+    <details style="margin-top:12px"><summary style="cursor:pointer;font-size:13px;font-weight:600">Script SQL da eseguire in Supabase</summary>
+<pre class="sql">create table if not exists contacts (
+  id uuid primary key,
+  cliente text, nome text, cognome text, ruolo text, note text,
+  created_at timestamptz default now());
+create table if not exists events (
+  id uuid primary key,
+  data date, tipo text, tono text, argomenti text, note text,
+  contact_ids jsonb default '[]',
+  created_at timestamptz default now());
+alter table contacts enable row level security;
+alter table events enable row level security;
+create policy "anon all c" on contacts for all using (true) with check (true);
+create policy "anon all e" on events for all using (true) with check (true);</pre>
+    <p class="hint">⚠️ Chiunque abbia la chiave anon può leggere i dati: non condividerla.</p>
+    </details>
+  </div>
+  <div class="card">
+    <h3>Backup dati</h3>
+    <div class="modal-actions" style="justify-content:flex-start">
+      <button class="btn" onclick="exportJson()">⬇️ Esporta JSON</button>
+      <button class="btn" onclick="document.getElementById('importFile').click()">⬆️ Importa JSON</button>
+      <input type="file" id="importFile" accept=".json" style="display:none" onchange="importJson(this)">
+    </div>
+    <p class="hint">L'export contiene tutti i contatti e gli eventi. L'import sostituisce i dati attuali.</p>
+  </div>
+</section>
+</main>
+
+<button class="fab show" id="fab" onclick="fabClick()">+</button>
+
+<!-- MODAL CONTATTO -->
+<div class="modal-bg" id="contactModal">
+  <div class="modal">
+    <h2 id="contactModalTitle">Nuovo contatto</h2>
+    <label>Cliente (azienda) *</label>
+    <input id="fCliente" list="clientiList" placeholder="Es. ACME S.p.A.">
+    <datalist id="clientiList"></datalist>
+    <div class="row2">
+      <div><label>Nome *</label><input id="fNome"></div>
+      <div><label>Cognome *</label><input id="fCognome"></div>
+    </div>
+    <label>Ruolo</label>
+    <input id="fRuolo" placeholder="Es. IT Manager">
+    <label>Note</label>
+    <textarea id="fNote" placeholder="Preferenze, dettagli utili…"></textarea>
+    <div class="modal-actions">
+      <button class="btn btn-danger" id="contactDeleteBtn" onclick="deleteContact()">Elimina</button>
+      <button class="btn" onclick="closeModal('contactModal')">Annulla</button>
+      <button class="btn btn-primary" onclick="saveContactForm()">Salva</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL EVENTO -->
+<div class="modal-bg" id="eventModal">
+  <div class="modal">
+    <h2 id="eventModalTitle">Nuovo evento</h2>
+    <div class="row2">
+      <div><label>Data *</label><input type="date" id="gData"></div>
+      <div><label>Tipo</label><select id="gTipo"></select></div>
+    </div>
+    <label>Persone coinvolte *</label>
+    <input id="gPersonSearch" placeholder="Filtra persone…" oninput="renderPeoplePicker()">
+    <div class="people-box" id="peoplePicker"></div>
+    <label>Tono della chiacchierata</label>
+    <select id="gTono"></select>
+    <label>Argomenti trattati</label>
+    <textarea id="gArgomenti" placeholder="Es. rinnovo contratto, nuovo progetto cloud…"></textarea>
+    <label>Note</label>
+    <textarea id="gNote"></textarea>
+    <div class="modal-actions">
+      <button class="btn btn-danger" id="eventDeleteBtn" onclick="deleteEvent()">Elimina</button>
+      <button class="btn" onclick="closeModal('eventModal')">Annulla</button>
+      <button class="btn btn-primary" onclick="saveEventForm()">Salva</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL DETTAGLIO CONTATTO -->
+<div class="modal-bg" id="detailModal">
+  <div class="modal">
+    <h2 id="detailName"></h2>
+    <p class="hint" id="detailInfo"></p>
+    <p class="t3" id="detailNote" style="white-space:pre-wrap;font-size:14px;margin-top:8px"></p>
+    <div class="modal-actions" style="justify-content:flex-start;margin-top:14px">
+      <button class="btn btn-sm" onclick="editFromDetail()">✏️ Modifica</button>
+      <button class="btn btn-sm btn-primary" onclick="newEventFromDetail()">+ Evento</button>
+    </div>
+    <h3 style="font-size:13px;color:var(--muted);margin:16px 0 4px;text-transform:uppercase">Storico eventi</h3>
+    <div id="detailEvents"></div>
+    <div class="modal-actions">
+      <button class="btn" onclick="closeModal('detailModal')">Chiudi</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+"use strict";
+const LS_DATA = "crm_contatti_data";
+const LS_CFG  = "crm_contatti_cfg";
+const TONES = ["Molto positivo","Positivo","Neutro","Teso","Negativo"];
+const TONE_CLASS = {"Molto positivo":"tone-mp","Positivo":"tone-p","Neutro":"tone-n","Teso":"tone-t","Negativo":"tone-neg"};
+const TONE_COLOR = {"Molto positivo":"#16a34a","Positivo":"#7ed49a","Neutro":"#b9c1cf","Teso":"#f0a63a","Negativo":"#d43a3a"};
+const TYPES = ["Di persona","Telefonata","Videocall","Email/Chat","Evento/Fiera"];
+const TYPE_ICON = {"Di persona":"🤝","Telefonata":"📞","Videocall":"💻","Email/Chat":"✉️","Evento/Fiera":"🎪"};
+
+let state = { contacts: [], events: [] };
+let cfg = {};
+let sb = null;
+let editingContactId = null, editingEventId = null, detailContactId = null, currentView = "dashboard";
+
+function esc(s){ return String(s==null?"":s).replace(/[&<>"']/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
+function uuid(){ return (crypto.randomUUID) ? crypto.randomUUID() : "id-"+Date.now()+"-"+Math.random().toString(16).slice(2); }
+function toast(msg){ const t=document.getElementById("toast"); t.textContent=msg; t.classList.add("show"); setTimeout(()=>t.classList.remove("show"),2600); }
+function today(){ return new Date().toISOString().slice(0,10); }
+function fmtDate(d){ if(!d) return ""; const p=d.slice(0,10).split("-"); return p.length===3 ? p[2]+"/"+p[1]+"/"+p[0] : d; }
+function fullName(c){ return (c.nome+" "+c.cognome).trim(); }
+function contactById(id){ return state.contacts.find(c=>c.id===id); }
+
+/* ---------- storage ---------- */
+function persistLocal(){ if(!sb) localStorage.setItem(LS_DATA, JSON.stringify(state)); }
+function loadLocal(){ try{ state = JSON.parse(localStorage.getItem(LS_DATA)) || {contacts:[],events:[]}; }catch(e){ state={contacts:[],events:[]}; } if(!state.contacts) state.contacts=[]; if(!state.events) state.events=[]; }
+
+async function connectSupabase(){
+  if(!cfg.url || !cfg.key || typeof supabase === "undefined") return false;
+  try{
+    sb = supabase.createClient(cfg.url, cfg.key);
+    const [rc, re] = await Promise.all([ sb.from("contacts").select("*"), sb.from("events").select("*") ]);
+    if(rc.error) throw rc.error;
+    if(re.error) throw re.error;
+    state.contacts = rc.data || [];
+    state.events = re.data || [];
+    document.getElementById("syncBadge").textContent = "☁️ Cloud";
+    return true;
+  }catch(e){
+    sb = null;
+    document.getElementById("syncBadge").textContent = "Locale (cloud KO)";
+    toast("Connessione Supabase fallita: " + (e.message||e));
+    return false;
+  }
+}
+
+async function upsertRecord(table, rec){
+  if(sb){ const {error} = await sb.from(table).upsert(rec); if(error){ toast("Errore salvataggio: "+error.message); return false; } }
+  else persistLocal();
+  return true;
+}
+async function deleteRecord(table, id){
+  if(sb){ const {error} = await sb.from(table).delete().eq("id", id); if(error){ toast("Errore eliminazione: "+error.message); return false; } }
+  else persistLocal();
+  return true;
+}
+
+/* ---------- viste ---------- */
+function switchView(v){
+  currentView = v;
+  document.querySelectorAll(".view").forEach(s=>s.classList.remove("active"));
+  document.getElementById("view-"+v).classList.add("active");
+  document.querySelectorAll("nav button").forEach(b=>b.classList.toggle("active", b.dataset.view===v));
+  document.getElementById("fab").classList.toggle("show", v==="contacts"||v==="events");
+  renderAll();
+}
+function fabClick(){ if(currentView==="events") openEventForm(); else openContactForm(); }
+
+function renderAll(){
+  renderDashboard(); renderContacts(); renderEvents(); refreshFilters();
+}
+
+function refreshFilters(){
+  const clients = [...new Set(state.contacts.map(c=>c.cliente).filter(Boolean))].sort();
+  const cf = document.getElementById("cClientFilter");
+  const cur = cf.value;
+  cf.innerHTML = '<option value="">Tutti i clienti</option>' + clients.map(c=>`<option ${c===cur?"selected":""}>${esc(c)}</option>`).join("");
+  const dl = document.getElementById("clientiList");
+  dl.innerHTML = clients.map(c=>`<option value="${esc(c)}">`).join("");
+  const pf = document.getElementById("ePersonFilter");
+  const curP = pf.value;
+  const people = [...state.contacts].sort((a,b)=>fullName(a).localeCompare(fullName(b)));
+  pf.innerHTML = '<option value="">Tutte le persone</option>' + people.map(c=>`<option value="${c.id}" ${c.id===curP?"selected":""}>${esc(fullName(c))}</option>`).join("");
+  const tf = document.getElementById("eToneFilter");
+  const curT = tf.value;
+  tf.innerHTML = '<option value="">Tutti i toni</option>' + TONES.map(t=>`<option ${t===curT?"selected":""}>${t}</option>`).join("");
+}
+
+/* ---------- dashboard ---------- */
+function lastEventDateFor(contactId){
+  let last = null;
+  for(const e of state.events){
+    if((e.contact_ids||[]).includes(contactId) && (!last || e.data > last)) last = e.data;
+  }
+  return last;
+}
+function renderDashboard(){
+  const now = new Date(), d30 = new Date(now-30*864e5).toISOString().slice(0,10), d90 = new Date(now-90*864e5).toISOString().slice(0,10);
+  document.getElementById("stContacts").textContent = state.contacts.length;
+  document.getElementById("stClients").textContent = new Set(state.contacts.map(c=>c.cliente).filter(Boolean)).size;
+  document.getElementById("stEvents30").textContent = state.events.filter(e=>e.data>=d30).length;
+
+  const recent = [...state.events].sort((a,b)=>(b.data||"").localeCompare(a.data||"")).slice(0,5);
+  document.getElementById("dashRecent").innerHTML = recent.length ? recent.map(eventRowHtml).join("") : '<div class="empty">Nessun evento registrato</div>';
+
+  const stale = state.contacts.map(c=>({c, last:lastEventDateFor(c.id)}))
+    .filter(x=>!x.last || x.last < d30)
+    .sort((a,b)=>(a.last||"0").localeCompare(b.last||"0")).slice(0,6);
+  document.getElementById("dashStale").innerHTML = stale.length ? stale.map(x=>`
+    <div class="item" onclick="openDetail('${x.c.id}')">
+      <div class="t1"><span>${esc(fullName(x.c))}</span><span class="badge tone-n">${x.last?("ultimo: "+fmtDate(x.last)):"mai sentito"}</span></div>
+      <div class="t2">${esc(x.c.ruolo||"")}${x.c.ruolo?" · ":""}${esc(x.c.cliente||"")}</div>
+    </div>`).join("") : '<div class="empty">Tutti i contatti sono stati sentiti di recente 👍</div>';
+
+  const recent90 = state.events.filter(e=>e.data>=d90 && e.tono);
+  if(recent90.length){
+    const counts = {};
+    TONES.forEach(t=>counts[t]=0);
+    recent90.forEach(e=>{ if(counts[e.tono]!=null) counts[e.tono]++; });
+    const tot = recent90.length;
+    document.getElementById("dashTone").innerHTML =
+      '<div class="tonebar">' + TONES.filter(t=>counts[t]).map(t=>`<div style="width:${(counts[t]/tot*100).toFixed(1)}%;background:${TONE_COLOR[t]}" title="${t}: ${counts[t]}"></div>`).join("") + '</div>' +
+      '<div style="margin-top:8px">' + TONES.filter(t=>counts[t]).map(t=>`<span class="chip">${t}: ${counts[t]}</span>`).join("") + '</div>';
+  } else {
+    document.getElementById("dashTone").innerHTML = '<div class="empty">Nessun evento negli ultimi 90 giorni</div>';
+  }
+}
+
+/* ---------- contatti ---------- */
+function renderContacts(){
+  const q = document.getElementById("cSearch").value.trim().toLowerCase();
+  const cl = document.getElementById("cClientFilter").value;
+  let list = [...state.contacts];
+  if(cl) list = list.filter(c=>c.cliente===cl);
+  if(q) list = list.filter(c=>(fullName(c)+" "+(c.ruolo||"")+" "+(c.cliente||"")+" "+(c.note||"")).toLowerCase().includes(q));
+  list.sort((a,b)=>(a.cognome||"").localeCompare(b.cognome||"")||(a.nome||"").localeCompare(b.nome||""));
+  document.getElementById("contactList").innerHTML = list.length ? list.map(c=>{
+    const last = lastEventDateFor(c.id);
+    return `<div class="item" onclick="openDetail('${c.id}')">
+      <div class="t1"><span>${esc(fullName(c))}</span>${last?`<span class="t2">ultimo contatto ${fmtDate(last)}</span>`:""}</div>
+      <div class="t2">${esc(c.ruolo||"—")} · <b>${esc(c.cliente||"—")}</b></div>
+      ${c.note?`<div class="t3">${esc(c.note.length>120?c.note.slice(0,120)+"…":c.note)}</div>`:""}
+    </div>`;
+  }).join("") : '<div class="empty">Nessun contatto. Premi “+ Nuovo” per iniziare.</div>';
+}
+
+function openContactForm(id){
+  editingContactId = id || null;
+  document.getElementById("contactModalTitle").textContent = id ? "Modifica contatto" : "Nuovo contatto";
+  document.getElementById("contactDeleteBtn").style.display = id ? "" : "none";
+  const c = id ? contactById(id) : {};
+  document.getElementById("fCliente").value = c.cliente||"";
+  document.getElementById("fNome").value = c.nome||"";
+  document.getElementById("fCognome").value = c.cognome||"";
+  document.getElementById("fRuolo").value = c.ruolo||"";
+  document.getElementById("fNote").value = c.note||"";
+  openModal("contactModal");
+}
+async function saveContactForm(){
+  const nome = document.getElementById("fNome").value.trim();
+  const cognome = document.getElementById("fCognome").value.trim();
+  const cliente = document.getElementById("fCliente").value.trim();
+  if(!nome || !cognome || !cliente){ toast("Compila cliente, nome e cognome"); return; }
+  const rec = {
+    id: editingContactId || uuid(),
+    cliente, nome, cognome,
+    ruolo: document.getElementById("fRuolo").value.trim(),
+    note: document.getElementById("fNote").value.trim(),
+    created_at: editingContactId ? (contactById(editingContactId)||{}).created_at : new Date().toISOString()
+  };
+  const i = state.contacts.findIndex(c=>c.id===rec.id);
+  if(i>=0) state.contacts[i]=rec; else state.contacts.push(rec);
+  if(await upsertRecord("contacts", rec)){ closeModal("contactModal"); renderAll(); toast("Contatto salvato"); }
+}
+async function deleteContact(){
+  if(!editingContactId || !confirm("Eliminare questo contatto? Verrà rimosso anche dagli eventi.")) return;
+  const id = editingContactId;
+  state.contacts = state.contacts.filter(c=>c.id!==id);
+  const touched = state.events.filter(e=>(e.contact_ids||[]).includes(id));
+  touched.forEach(e=>{ e.contact_ids = e.contact_ids.filter(x=>x!==id); });
+  await deleteRecord("contacts", id);
+  for(const e of touched) await upsertRecord("events", e);
+  persistLocal();
+  closeModal("contactModal"); closeModal("detailModal"); renderAll(); toast("Contatto eliminato");
+}
+
+/* ---------- dettaglio ---------- */
+function openDetail(id){
+  detailContactId = id;
+  const c = contactById(id); if(!c) return;
+  document.getElementById("detailName").textContent = fullName(c);
+  document.getElementById("detailInfo").textContent = (c.ruolo?c.ruolo+" · ":"") + (c.cliente||"");
+  document.getElementById("detailNote").textContent = c.note||"";
+  const evs = state.events.filter(e=>(e.contact_ids||[]).includes(id)).sort((a,b)=>(b.data||"").localeCompare(a.data||""));
+  document.getElementById("detailEvents").innerHTML = evs.length ? evs.map(eventRowHtml).join("") : '<div class="empty">Nessun evento con questa persona</div>';
+  openModal("detailModal");
+}
+function editFromDetail(){ closeModal("detailModal"); openContactForm(detailContactId); }
+function newEventFromDetail(){ closeModal("detailModal"); openEventForm(null, detailContactId); }
+
+/* ---------- eventi ---------- */
+function eventRowHtml(e){
+  const names = (e.contact_ids||[]).map(id=>{ const c=contactById(id); return c?esc(fullName(c)):"?"; });
+  return `<div class="item" onclick="event.stopPropagation();openEventForm('${e.id}')">
+    <div class="t1">
+      <span>${TYPE_ICON[e.tipo]||"📌"} ${fmtDate(e.data)} · ${esc(e.tipo||"")}</span>
+      ${e.tono?`<span class="badge ${TONE_CLASS[e.tono]||"tone-n"}">${esc(e.tono)}</span>`:""}
+    </div>
+    <div class="t2">${names.map(n=>`<span class="chip">${n}</span>`).join("")}</div>
+    ${e.argomenti?`<div class="t3">💬 ${esc(e.argomenti)}</div>`:""}
+    ${e.note?`<div class="t3" style="color:var(--muted)">${esc(e.note)}</div>`:""}
+  </div>`;
+}
+function renderEvents(){
+  const p = document.getElementById("ePersonFilter").value;
+  const t = document.getElementById("eToneFilter").value;
+  const from = document.getElementById("eFrom").value, to = document.getElementById("eTo").value;
+  let list = [...state.events];
+  if(p) list = list.filter(e=>(e.contact_ids||[]).includes(p));
+  if(t) list = list.filter(e=>e.tono===t);
+  if(from) list = list.filter(e=>e.data>=from);
+  if(to) list = list.filter(e=>e.data<=to);
+  list.sort((a,b)=>(b.data||"").localeCompare(a.data||""));
+  document.getElementById("eventList").innerHTML = list.length ? list.map(eventRowHtml).join("") : '<div class="empty">Nessun evento trovato.</div>';
+}
+
+function renderPeoplePicker(selected){
+  const box = document.getElementById("peoplePicker");
+  const checked = selected || [...box.querySelectorAll("input:checked")].map(i=>i.value);
+  const q = document.getElementById("gPersonSearch").value.trim().toLowerCase();
+  let people = [...state.contacts].sort((a,b)=>fullName(a).localeCompare(fullName(b)));
+  if(q) people = people.filter(c=>(fullName(c)+" "+(c.cliente||"")).toLowerCase().includes(q));
+  box.innerHTML = people.length ? people.map(c=>`
+    <label><input type="checkbox" value="${c.id}" ${checked.includes(c.id)?"checked":""}> ${esc(fullName(c))} <span style="color:var(--muted);font-size:12px">· ${esc(c.cliente||"")}</span></label>
+  `).join("") : '<div class="empty" style="padding:8px 0">Nessuna persona (crea prima il contatto)</div>';
+}
+
+function openEventForm(id, presetContactId){
+  editingEventId = id || null;
+  document.getElementById("eventModalTitle").textContent = id ? "Modifica evento" : "Nuovo evento";
+  document.getElementById("eventDeleteBtn").style.display = id ? "" : "none";
+  const e = id ? state.events.find(x=>x.id===id) : {};
+  document.getElementById("gData").value = e.data || today();
+  document.getElementById("gTipo").innerHTML = TYPES.map(t=>`<option ${t===e.tipo?"selected":""}>${t}</option>`).join("");
+  document.getElementById("gTono").innerHTML = TONES.map(t=>`<option ${t===(e.tono||"Neutro")?"selected":""}>${t}</option>`).join("");
+  document.getElementById("gArgomenti").value = e.argomenti||"";
+  document.getElementById("gNote").value = e.note||"";
+  document.getElementById("gPersonSearch").value = "";
+  renderPeoplePicker(e.contact_ids || (presetContactId?[presetContactId]:[]));
+  openModal("eventModal");
+}
+async function saveEventForm(){
+  const ids = [...document.querySelectorAll("#peoplePicker input:checked")].map(i=>i.value);
+  const data = document.getElementById("gData").value;
+  if(!data){ toast("Inserisci la data"); return; }
+  if(!ids.length){ toast("Seleziona almeno una persona"); return; }
+  const rec = {
+    id: editingEventId || uuid(),
+    data,
+    tipo: document.getElementById("gTipo").value,
+    tono: document.getElementById("gTono").value,
+    argomenti: document.getElementById("gArgomenti").value.trim(),
+    note: document.getElementById("gNote").value.trim(),
+    contact_ids: ids,
+    created_at: editingEventId ? (state.events.find(x=>x.id===editingEventId)||{}).created_at : new Date().toISOString()
+  };
+  const i = state.events.findIndex(e=>e.id===rec.id);
+  if(i>=0) state.events[i]=rec; else state.events.push(rec);
+  if(await upsertRecord("events", rec)){ closeModal("eventModal"); renderAll(); toast("Evento salvato"); }
+}
+async function deleteEvent(){
+  if(!editingEventId || !confirm("Eliminare questo evento?")) return;
+  state.events = state.events.filter(e=>e.id!==editingEventId);
+  await deleteRecord("events", editingEventId);
+  closeModal("eventModal"); renderAll(); toast("Evento eliminato");
+}
+
+/* ---------- impostazioni ---------- */
+function saveSupabaseCfg(){
+  cfg = { url: document.getElementById("sbUrl").value.trim().replace(/\/+$/,""), key: document.getElementById("sbKey").value.trim() };
+  if(!cfg.url || !cfg.key){ toast("Inserisci URL e chiave"); return; }
+  localStorage.setItem(LS_CFG, JSON.stringify(cfg));
+  connectSupabase().then(ok=>{ if(ok){ toast("Connesso al cloud ✓"); renderAll(); } });
+}
+function disconnectSupabase(){
+  localStorage.removeItem(LS_CFG); cfg={}; sb=null;
+  document.getElementById("syncBadge").textContent = "Locale";
+  loadLocal(); renderAll(); toast("Disconnesso: modalità locale");
+}
+async function migrateLocalToCloud(){
+  if(!sb){ toast("Prima connettiti a Supabase"); return; }
+  let local;
+  try{ local = JSON.parse(localStorage.getItem(LS_DATA)) || {contacts:[],events:[]}; }catch(e){ local={contacts:[],events:[]}; }
+  if(!local.contacts.length && !local.events.length){ toast("Nessun dato locale da migrare"); return; }
+  const r1 = local.contacts.length ? await sb.from("contacts").upsert(local.contacts) : {error:null};
+  const r2 = local.events.length ? await sb.from("events").upsert(local.events) : {error:null};
+  if(r1.error || r2.error){ toast("Errore migrazione: "+((r1.error||r2.error).message)); return; }
+  await connectSupabase(); renderAll();
+  toast(`Migrati ${local.contacts.length} contatti e ${local.events.length} eventi ✓`);
+}
+
+function exportJson(){
+  const blob = new Blob([JSON.stringify(state,null,2)], {type:"application/json"});
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = "contatti_backup_"+today()+".json";
+  a.click(); URL.revokeObjectURL(a.href);
+}
+function importJson(input){
+  const f = input.files[0]; if(!f) return;
+  const reader = new FileReader();
+  reader.onload = async () => {
+    try{
+      const d = JSON.parse(reader.result);
+      if(!Array.isArray(d.contacts) || !Array.isArray(d.events)) throw new Error("formato non valido");
+      if(!confirm(`Importare ${d.contacts.length} contatti e ${d.events.length} eventi? I dati attuali verranno sostituiti.`)) return;
+      state = d;
+      if(sb){
+        await sb.from("events").delete().neq("id","");
+        await sb.from("contacts").delete().neq("id","");
+        if(d.contacts.length) await sb.from("contacts").upsert(d.contacts);
+        if(d.events.length) await sb.from("events").upsert(d.events);
+      } else persistLocal();
+      renderAll(); toast("Import completato ✓");
+    }catch(e){ toast("File non valido: "+e.message); }
+    input.value="";
+  };
+  reader.readAsText(f);
+}
+
+/* ---------- modali ---------- */
+function openModal(id){ document.getElementById(id).classList.add("open"); }
+function closeModal(id){ document.getElementById(id).classList.remove("open"); }
+document.querySelectorAll(".modal-bg").forEach(m=>m.addEventListener("click", e=>{ if(e.target===m) m.classList.remove("open"); }));
+
+/* ---------- init ---------- */
+(async function(){
+  try{ cfg = JSON.parse(localStorage.getItem(LS_CFG)) || {}; }catch(e){ cfg={}; }
+  document.getElementById("sbUrl").value = cfg.url||"";
+  document.getElementById("sbKey").value = cfg.key||"";
+  loadLocal();
+  if(cfg.url && cfg.key) await connectSupabase();
+  renderAll();
+})();
+</script>
+</body>
+</html>
