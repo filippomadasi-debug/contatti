@@ -271,6 +271,8 @@ function toast(msg){ const t=document.getElementById("toast"); t.textContent=msg
 function today(){ return new Date().toISOString().slice(0,10); }
 function fmtDate(d){ if(!d) return ""; const p=d.slice(0,10).split("-"); return p.length===3 ? p[2]+"/"+p[1]+"/"+p[0] : d; }
 function fullName(c){ return (c.nome+" "+c.cognome).trim(); }
+const collator = new Intl.Collator("it", {sensitivity:"base"});
+function byCognome(a,b){ return collator.compare(a.cognome||"", b.cognome||"") || collator.compare(a.nome||"", b.nome||""); }
 function contactById(id){ return state.contacts.find(c=>c.id===id); }
 
 /* ---------- storage ---------- */
@@ -323,13 +325,13 @@ function renderAll(){
 }
 
 function refreshFilters(){
-  const clients = [...new Set(state.contacts.map(c=>c.cliente).filter(Boolean))].sort();
+  const clients = [...new Set(state.contacts.map(c=>c.cliente).filter(Boolean))].sort(collator.compare);
   const cf = document.getElementById("cClientFilter");
   const cur = cf.value;
   cf.innerHTML = '<option value="">Tutti i clienti</option>' + clients.map(c=>`<option ${c===cur?"selected":""}>${esc(c)}</option>`).join("");
   const pf = document.getElementById("ePersonFilter");
   const curP = pf.value;
-  const people = [...state.contacts].sort((a,b)=>fullName(a).localeCompare(fullName(b)));
+  const people = [...state.contacts].sort(byCognome);
   pf.innerHTML = '<option value="">Tutte le persone</option>' + people.map(c=>`<option value="${c.id}" ${c.id===curP?"selected":""}>${esc(fullName(c))}</option>`).join("");
   const tf = document.getElementById("eToneFilter");
   const curT = tf.value;
@@ -383,7 +385,7 @@ function renderContacts(){
   let list = [...state.contacts];
   if(cl) list = list.filter(c=>c.cliente===cl);
   if(q) list = list.filter(c=>(fullName(c)+" "+(c.ruolo||"")+" "+(c.cliente||"")+" "+(c.note||"")).toLowerCase().includes(q));
-  list.sort((a,b)=>(a.cognome||"").localeCompare(b.cognome||"")||(a.nome||"").localeCompare(b.nome||""));
+  list.sort(byCognome);
   document.getElementById("contactList").innerHTML = list.length ? list.map(c=>{
     const last = lastEventDateFor(c.id);
     return `<div class="item" onclick="openDetail('${c.id}')">
@@ -395,7 +397,7 @@ function renderContacts(){
 }
 
 function clientiEsistenti(){
-  return [...new Set(state.contacts.map(c=>(c.cliente||"").trim()).filter(Boolean))].sort((a,b)=>a.localeCompare(b));
+  return [...new Set(state.contacts.map(c=>(c.cliente||"").trim()).filter(Boolean))].sort(collator.compare);
 }
 let _clienteSuggest = [];
 function renderClienteSuggest(){
@@ -503,7 +505,7 @@ function renderPeoplePicker(selected){
   const box = document.getElementById("peoplePicker");
   const checked = selected || [...box.querySelectorAll("input:checked")].map(i=>i.value);
   const q = document.getElementById("gPersonSearch").value.trim().toLowerCase();
-  let people = [...state.contacts].sort((a,b)=>fullName(a).localeCompare(fullName(b)));
+  let people = [...state.contacts].sort(byCognome);
   if(q) people = people.filter(c=>(fullName(c)+" "+(c.cliente||"")).toLowerCase().includes(q));
   box.innerHTML = people.length ? people.map(c=>`
     <label><input type="checkbox" value="${c.id}" ${checked.includes(c.id)?"checked":""}> ${esc(fullName(c))} <span style="color:var(--muted);font-size:12px">· ${esc(c.cliente||"")}</span></label>
