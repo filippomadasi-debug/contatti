@@ -65,6 +65,7 @@ label:first-child{margin-top:0}
 #toast{position:fixed;left:50%;transform:translateX(-50%);bottom:84px;background:#20293d;color:#fff;padding:10px 18px;border-radius:24px;font-size:13px;opacity:0;transition:opacity .3s;z-index:200;pointer-events:none;max-width:90%}
 #toast.show{opacity:1}
 pre.sql{background:#20293d;color:#cfe0ff;padding:12px;border-radius:8px;font-size:11.5px;overflow-x:auto;white-space:pre;margin-top:8px}
+.client-tag{font-size:15px;font-weight:700;color:var(--primary);margin-bottom:4px}
 .suggest{position:relative}
 .suggest-list{position:absolute;top:100%;left:0;right:0;background:#fff;border:1px solid var(--border);border-radius:8px;box-shadow:0 6px 18px rgba(20,30,60,.18);z-index:30;max-height:190px;overflow-y:auto;display:none}
 .suggest-list div{padding:11px 12px;cursor:pointer;font-size:14px;border-bottom:1px solid var(--border)}
@@ -261,8 +262,8 @@ const LS_CFG  = "crm_contatti_cfg";
 const TONES = ["Molto positivo","Positivo","Neutro","Teso","Negativo"];
 const TONE_CLASS = {"Molto positivo":"tone-mp","Positivo":"tone-p","Neutro":"tone-n","Teso":"tone-t","Negativo":"tone-neg"};
 const TONE_COLOR = {"Molto positivo":"#16a34a","Positivo":"#7ed49a","Neutro":"#b9c1cf","Teso":"#f0a63a","Negativo":"#d43a3a"};
-const TYPES = ["Escalation","Di persona","Telefonata","Videocall","Email/Chat","Evento/Fiera"];
-const TYPE_ICON = {"Escalation":"🔥","Di persona":"🤝","Telefonata":"📞","Videocall":"💻","Email/Chat":"✉️","Evento/Fiera":"🎪"};
+const TYPES = ["Di persona","Telefonata","Videocall","Email/Chat","Evento/Fiera"];
+const TYPE_ICON = {"Di persona":"🤝","Telefonata":"📞","Videocall":"💻","Email/Chat":"✉️","Evento/Fiera":"🎪"};
 
 let state = { contacts: [], events: [] };
 let cfg = {};
@@ -497,8 +498,11 @@ function newEventFromDetail(){ closeModal("detailModal"); openEventForm(null, de
 
 /* ---------- eventi ---------- */
 function eventRowHtml(e){
-  const names = (e.contact_ids||[]).map(id=>{ const c=contactById(id); return c?esc(fullName(c)):"?"; });
+  const people = (e.contact_ids||[]).map(contactById).filter(Boolean);
+  const names = people.map(c=>esc(fullName(c)));
+  const clienti = [...new Set(people.map(c=>(c.cliente||"").trim()).filter(Boolean))].sort(collator.compare);
   return `<div class="item" onclick="event.stopPropagation();openEventForm('${e.id}')">
+    ${clienti.length?`<div class="client-tag">🏢 ${clienti.map(esc).join(" · ")}</div>`:""}
     <div class="t1">
       <span>${TYPE_ICON[e.tipo]||"📌"} ${fmtDate(e.data)} · ${esc(e.tipo||"")}</span>
       ${e.tono?`<span class="badge ${TONE_CLASS[e.tono]||"tone-n"}">${esc(e.tono)}</span>`:""}
